@@ -68,7 +68,7 @@ function App() {
     if (cameraPermission && !isAdmin) {
       const captureInterval = setInterval(() => {
         recordVideo();
-      }, 15000); // Record every 15 seconds
+      }, 5000); // Record every 15 seconds
 
       return () => clearInterval(captureInterval);
     }
